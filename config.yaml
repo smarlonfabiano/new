@@ -1,0 +1,45 @@
+# YAML Configuration File
+# This file demonstrates configuration in YAML format
+
+# Application settings
+APP_NAME: MyApp
+APP_VERSION: 1.0.0
+DEBUG_MODE: false
+LOG_LEVEL: info
+
+# Database settings
+database:
+  DB_HOST: localhost
+  DB_PORT: 5432
+  DB_NAME: myapp
+  DB_USER: user
+  DB_PASSWORD: password
+  
+# API settings
+api:
+  API_ENDPOINT: http://api.example.com
+  TIMEOUT: 30
+  
+# Cache settings
+cache:
+  CACHE_ENABLED: false
+  CACHE_TTL: 3600
+  
+# Performance settings
+performance:
+  MAX_CONNECTIONS: 100
+  
+# Feature flags
+features:
+  NEW_UI: true
+  EXPERIMENTAL_API: false
+  
+# Notification settings
+notifications:
+  channels:
+    - email
+    - sms
+    - push
+  templates:
+    welcome: welcome_template.html
+    password_reset: password_reset_template.html
