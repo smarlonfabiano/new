@@ -1,0 +1,15 @@
+node_modules
+npm-debug.log
+.git
+.github
+.gitignore
+.husky
+.vscode
+coverage
+*.md
+!README.md
+.env*
+.eslintrc.js
+.prettierrc
+jest.config.js
+tests
