@@ -1,0 +1,229 @@
+#!/usr/bin/env python3
+"""
+A simple command-line issue tracking system.
+"""
+
+import argparse
+import json
+import os
+from datetime import datetime
+from typing import Dict, List, Optional, Any
+
+# File to store issues
+ISSUES_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "issues.json")
+
+class Issue:
+    """Represents an issue in the tracking system."""
+    
+    def __init__(self, 
+                 title: str, 
+                 description: str, 
+                 status: str = "open", 
+                 issue_id: Optional[int] = None,
+                 created_at: Optional[str] = None):
+        """
+        Initialize a new issue.
+        
+        Args:
+            title: The title of the issue
+            description: A detailed description of the issue
+            status: The current status of the issue (default: "open")
+            issue_id: The ID of the issue (auto-generated if None)
+            created_at: The creation timestamp (auto-generated if None)
+        """
+        self.title = title
+        self.description = description
+        self.status = status
+        self.issue_id = issue_id
+        self.created_at = created_at or datetime.now().isoformat()
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert the issue to a dictionary."""
+        return {
+            "id": self.issue_id,
+            "title": self.title,
+            "description": self.description,
+            "status": self.status,
+            "created_at": self.created_at
+        }
+    
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'Issue':
+        """Create an issue from a dictionary."""
+        return cls(
+            title=data["title"],
+            description=data["description"],
+            status=data["status"],
+            issue_id=data["id"],
+            created_at=data["created_at"]
+        )
+    
+    def __str__(self) -> str:
+        """Return a string representation of the issue."""
+        return f"Issue #{self.issue_id}: {self.title} [{self.status}]"
+
+
+class IssueTracker:
+    """Manages issues in the tracking system."""
+    
+    def __init__(self, issues_file: str = ISSUES_FILE):
+        """
+        Initialize the issue tracker.
+        
+        Args:
+            issues_file: Path to the JSON file storing issues
+        """
+        self.issues_file = issues_file
+        self.issues = self._load_issues()
+    
+    def _load_issues(self) -> List[Issue]:
+        """Load issues from the JSON file."""
+        if not os.path.exists(self.issues_file):
+            return []
+        
+        try:
+            with open(self.issues_file, 'r') as f:
+                data = json.load(f)
+                return [Issue.from_dict(issue_data) for issue_data in data]
+        except (json.JSONDecodeError, FileNotFoundError):
+            return []
+    
+    def _save_issues(self) -> None:
+        """Save issues to the JSON file."""
+        # Create directory if it doesn't exist
+        os.makedirs(os.path.dirname(self.issues_file), exist_ok=True)
+        
+        with open(self.issues_file, 'w') as f:
+            json.dump([issue.to_dict() for issue in self.issues], f, indent=2)
+    
+    def add_issue(self, title: str, description: str) -> Issue:
+        """
+        Add a new issue.
+        
+        Args:
+            title: The title of the issue
+            description: A detailed description of the issue
+            
+        Returns:
+            The newly created issue
+        """
+        # Generate a new ID (max existing ID + 1, or 1 if no issues exist)
+        new_id = max([issue.issue_id for issue in self.issues], default=0) + 1
+        
+        # Create and add the new issue
+        issue = Issue(title=title, description=description, issue_id=new_id)
+        self.issues.append(issue)
+        self._save_issues()
+        return issue
+    
+    def list_issues(self, status: Optional[str] = None) -> List[Issue]:
+        """
+        List all issues, optionally filtered by status.
+        
+        Args:
+            status: If provided, only issues with this status will be returned
+            
+        Returns:
+            A list of issues
+        """
+        if status:
+            return [issue for issue in self.issues if issue.status.lower() == status.lower()]
+        return self.issues
+    
+    def get_issue(self, issue_id: int) -> Optional[Issue]:
+        """
+        Get an issue by ID.
+        
+        Args:
+            issue_id: The ID of the issue to retrieve
+            
+        Returns:
+            The issue if found, None otherwise
+        """
+        for issue in self.issues:
+            if issue.issue_id == issue_id:
+                return issue
+        return None
+    
+    def update_issue(self, issue_id: int, **kwargs) -> Optional[Issue]:
+        """
+        Update an issue.
+        
+        Args:
+            issue_id: The ID of the issue to update
+            **kwargs: Fields to update (title, description, status)
+            
+        Returns:
+            The updated issue if found, None otherwise
+        """
+        issue = self.get_issue(issue_id)
+        if not issue:
+            return None
+        
+        # Update fields
+        for field, value in kwargs.items():
+            if hasattr(issue, field):
+                setattr(issue, field, value)
+        
+        self._save_issues()
+        return issue
+
+
+def main():
+    """Main entry point for the issue tracker CLI."""
+    parser = argparse.ArgumentParser(description="Simple Issue Tracker")
+    subparsers = parser.add_subparsers(dest="command", help="Command to run")
+    
+    # Add issue command
+    add_parser = subparsers.add_parser("add", help="Add a new issue")
+    add_parser.add_argument("title", help="Issue title")
+    add_parser.add_argument("description", help="Issue description")
+    
+    # List issues command
+    list_parser = subparsers.add_parser("list", help="List all issues")
+    list_parser.add_argument("--status", help="Filter issues by status")
+    
+    # Update issue command
+    update_parser = subparsers.add_parser("update", help="Update an issue")
+    update_parser.add_argument("id", type=int, help="Issue ID")
+    update_parser.add_argument("--title", help="New title")
+    update_parser.add_argument("--description", help="New description")
+    update_parser.add_argument("--status", help="New status")
+    
+    args = parser.parse_args()
+    tracker = IssueTracker()
+    
+    if args.command == "add":
+        issue = tracker.add_issue(args.title, args.description)
+        print(f"Added {issue}")
+    
+    elif args.command == "list":
+        issues = tracker.list_issues(args.status)
+        if not issues:
+            print("No issues found.")
+        else:
+            print(f"Found {len(issues)} issue(s):")
+            for issue in issues:
+                print(f"  {issue}")
+    
+    elif args.command == "update":
+        kwargs = {}
+        if args.title:
+            kwargs["title"] = args.title
+        if args.description:
+            kwargs["description"] = args.description
+        if args.status:
+            kwargs["status"] = args.status
+        
+        issue = tracker.update_issue(args.id, **kwargs)
+        if issue:
+            print(f"Updated {issue}")
+        else:
+            print(f"Issue #{args.id} not found.")
+    
+    else:
+        parser.print_help()
+
+
+if __name__ == "__main__":
+    main()

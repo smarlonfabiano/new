@@ -1,0 +1,5 @@
+#!/bin/bash
+# Simple wrapper script to list all issues
+
+# Execute the issue tracker with the list command
+./issue_tracker list
