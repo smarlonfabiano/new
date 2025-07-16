@@ -1,0 +1,33 @@
+// AI Provider: OpenAI
+// Model: GPT-4
+// Version: 1.0.0
+// API Endpoint: https://api.openai.com/v1/chat/completions
+// Documentation: https://platform.openai.com/docs/api-reference
+// Last Updated: 2023-07-15
+
+{
+  "request": {
+    "model": "gpt-4",
+    "messages": [
+      {
+        "role": "system",
+        "content": "You are a helpful assistant."
+      },
+      {
+        "role": "user",
+        "content": "Hello, how are you today?"
+      }
+    ],
+    "temperature": 0.7,
+    "max_tokens": 150,
+    "top_p": 1.0,
+    "frequency_penalty": 0.0,
+    "presence_penalty": 0.0
+  },
+  "metadata": {
+    "timestamp": "2023-07-15T14:30:00Z",
+    "request_id": "req_12345abcde",
+    "user_id": "user_67890fghij",
+    "session_id": "sess_54321zyxwv"
+  }
+}
