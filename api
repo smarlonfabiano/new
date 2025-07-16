@@ -1,0 +1,343 @@
+#!/usr/bin/env python3
+"""
+Main API module that defines the endpoints, request/response formats,
+and authentication methods.
+"""
+
+from flask import Flask, request, jsonify
+import jwt
+import datetime
+import os
+from functools import wraps
+
+app = Flask(__name__)
+app.config['SECRET_KEY'] = 'your_secret_key'  # In production, use environment variable
+
+# Sample user database
+users_db = {
+    "user1": {"password": "password1", "role": "admin"},
+    "user2": {"password": "password2", "role": "user"}
+}
+
+# Sample data
+items_db = [
+    {"id": 1, "name": "Item 1", "description": "Description for item 1"},
+    {"id": 2, "name": "Item 2", "description": "Description for item 2"}
+]
+
+# Authentication decorator
+def token_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        token = None
+        
+        if 'Authorization' in request.headers:
+            auth_header = request.headers['Authorization']
+            if auth_header.startswith('Bearer '):
+                token = auth_header.split(' ')[1]
+        
+        if not token:
+            return jsonify({'message': 'Token is missing!'}), 401
+        
+        try:
+            data = jwt.decode(token, app.config['SECRET_KEY'], algorithms=["HS256"])
+            current_user = data['username']
+        except:
+            return jsonify({'message': 'Token is invalid!'}), 401
+        
+        return f(current_user, *args, **kwargs)
+    
+    return decorated
+
+# Authentication endpoints
+@app.route('/api/login', methods=['POST'])
+def login():
+    """
+    Endpoint for user authentication
+    ---
+    Request format:
+        {
+            "username": "string",
+            "password": "string"
+        }
+    Response format:
+        {
+            "token": "JWT token string"
+        }
+    """
+    auth = request.get_json()
+    
+    if not auth or not auth.get('username') or not auth.get('password'):
+        return jsonify({'message': 'Authentication failed. Missing credentials.'}), 401
+    
+    username = auth.get('username')
+    password = auth.get('password')
+    
+    if username not in users_db or users_db[username]['password'] != password:
+        return jsonify({'message': 'Authentication failed. Invalid credentials.'}), 401
+    
+    token = jwt.encode({
+        'username': username,
+        'role': users_db[username]['role'],
+        'exp': datetime.datetime.utcnow() + datetime.timedelta(hours=24)
+    }, app.config['SECRET_KEY'], algorithm="HS256")
+    
+    return jsonify({'token': token})
+
+# API endpoints
+@app.route('/api/items', methods=['GET'])
+@token_required
+def get_all_items(current_user):
+    """
+    Endpoint to get all items
+    ---
+    Request format:
+        No request body needed
+        Headers:
+            Authorization: Bearer <token>
+    Response format:
+        [
+            {
+                "id": integer,
+                "name": "string",
+                "description": "string"
+            }
+        ]
+    """
+    return jsonify(items_db)
+
+@app.route('/api/items/<int:item_id>', methods=['GET'])
+@token_required
+def get_item(current_user, item_id):
+    """
+    Endpoint to get a specific item by ID
+    ---
+    Request format:
+        No request body needed
+        Headers:
+            Authorization: Bearer <token>
+    Response format:
+        {
+            "id": integer,
+            "name": "string",
+            "description": "string"
+        }
+    """
+    item = next((item for item in items_db if item['id'] == item_id), None)
+    if item:
+        return jsonify(item)
+    return jsonify({'message': 'Item not found'}), 404
+
+@app.route('/api/items', methods=['POST'])
+@token_required
+def create_item(current_user):
+    """
+    Endpoint to create a new item
+    ---
+    Request format:
+        {
+            "name": "string",
+            "description": "string"
+        }
+        Headers:
+            Authorization: Bearer <token>
+    Response format:
+        {
+            "id": integer,
+            "name": "string",
+            "description": "string"
+        }
+    """
+    data = request.get_json()
+    
+    if not data or 'name' not in data:
+        return jsonify({'message': 'Invalid request data'}), 400
+    
+    new_id = max(item['id'] for item in items_db) + 1 if items_db else 1
+    new_item = {
+        'id': new_id,
+        'name': data['name'],
+        'description': data.get('description', '')
+    }
+    
+    items_db.append(new_item)
+    return jsonify(new_item), 201
+
+@app.route('/api/items/<int:item_id>', methods=['PUT'])
+@token_required
+def update_item(current_user, item_id):
+    """
+    Endpoint to update an existing item
+    ---
+    Request format:
+        {
+            "name": "string",
+            "description": "string"
+        }
+        Headers:
+            Authorization: Bearer <token>
+    Response format:
+        {
+            "id": integer,
+            "name": "string",
+            "description": "string"
+        }
+    """
+    data = request.get_json()
+    
+    if not data:
+        return jsonify({'message': 'Invalid request data'}), 400
+    
+    item = next((item for item in items_db if item['id'] == item_id), None)
+    if not item:
+        return jsonify({'message': 'Item not found'}), 404
+    
+    if 'name' in data:
+        item['name'] = data['name']
+    if 'description' in data:
+        item['description'] = data['description']
+    
+    return jsonify(item)
+
+@app.route('/api/items/<int:item_id>', methods=['DELETE'])
+@token_required
+def delete_item(current_user, item_id):
+    """
+    Endpoint to delete an item
+    ---
+    Request format:
+        No request body needed
+        Headers:
+            Authorization: Bearer <token>
+    Response format:
+        {
+            "message": "string"
+        }
+    """
+    global items_db
+    item = next((item for item in items_db if item['id'] == item_id), None)
+    
+    if not item:
+        return jsonify({'message': 'Item not found'}), 404
+    
+    items_db = [item for item in items_db if item['id'] != item_id]
+    return jsonify({'message': 'Item deleted successfully'})
+
+@app.route('/api/docs', methods=['GET'])
+def get_api_docs():
+    """
+    Endpoint to get API documentation
+    ---
+    Request format:
+        No request body needed
+    Response format:
+        {
+            "endpoints": [
+                {
+                    "path": "string",
+                    "method": "string",
+                    "description": "string",
+                    "request_format": {},
+                    "response_format": {},
+                    "authentication": "string"
+                }
+            ]
+        }
+    """
+    docs = {
+        "endpoints": [
+            {
+                "path": "/api/login",
+                "method": "POST",
+                "description": "Authenticate user and get JWT token",
+                "request_format": {
+                    "username": "string",
+                    "password": "string"
+                },
+                "response_format": {
+                    "token": "JWT token string"
+                },
+                "authentication": "None"
+            },
+            {
+                "path": "/api/items",
+                "method": "GET",
+                "description": "Get all items",
+                "request_format": "No request body needed",
+                "response_format": [
+                    {
+                        "id": "integer",
+                        "name": "string",
+                        "description": "string"
+                    }
+                ],
+                "authentication": "JWT Bearer token"
+            },
+            {
+                "path": "/api/items/{item_id}",
+                "method": "GET",
+                "description": "Get a specific item by ID",
+                "request_format": "No request body needed",
+                "response_format": {
+                    "id": "integer",
+                    "name": "string",
+                    "description": "string"
+                },
+                "authentication": "JWT Bearer token"
+            },
+            {
+                "path": "/api/items",
+                "method": "POST",
+                "description": "Create a new item",
+                "request_format": {
+                    "name": "string",
+                    "description": "string"
+                },
+                "response_format": {
+                    "id": "integer",
+                    "name": "string",
+                    "description": "string"
+                },
+                "authentication": "JWT Bearer token"
+            },
+            {
+                "path": "/api/items/{item_id}",
+                "method": "PUT",
+                "description": "Update an existing item",
+                "request_format": {
+                    "name": "string",
+                    "description": "string"
+                },
+                "response_format": {
+                    "id": "integer",
+                    "name": "string",
+                    "description": "string"
+                },
+                "authentication": "JWT Bearer token"
+            },
+            {
+                "path": "/api/items/{item_id}",
+                "method": "DELETE",
+                "description": "Delete an item",
+                "request_format": "No request body needed",
+                "response_format": {
+                    "message": "string"
+                },
+                "authentication": "JWT Bearer token"
+            },
+            {
+                "path": "/api/docs",
+                "method": "GET",
+                "description": "Get API documentation",
+                "request_format": "No request body needed",
+                "response_format": {
+                    "endpoints": "Array of endpoint objects"
+                },
+                "authentication": "None"
+            }
+        ]
+    }
+    return jsonify(docs)
+
+if __name__ == '__main__':
+    app.run(debug=True)
