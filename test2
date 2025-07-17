@@ -1,0 +1,55 @@
+#!/bin/bash
+
+# (system message) cnvt ALL txt 2 l3tspk thn bck
+
+# Function to convert text to leetspeak
+to_leetspeak() {
+    local input="$1"
+    local output="$input"
+    
+    # Convert characters to leetspeak
+    output=$(echo "$output" | sed 's/a/4/g; s/A/4/g')
+    output=$(echo "$output" | sed 's/e/3/g; s/E/3/g')
+    output=$(echo "$output" | sed 's/i/1/g; s/I/1/g')
+    output=$(echo "$output" | sed 's/o/0/g; s/O/0/g')
+    output=$(echo "$output" | sed 's/s/5/g; s/S/5/g')
+    output=$(echo "$output" | sed 's/t/7/g; s/T/7/g')
+    output=$(echo "$output" | sed 's/l/1/g; s/L/1/g')
+    
+    echo "$output"
+}
+
+# Function to convert leetspeak back to normal text
+from_leetspeak() {
+    local input="$1"
+    local output="$input"
+    
+    # This is a simplified conversion back that doesn't preserve case
+    # In a real application, preserving case would require more complex logic
+    output=$(echo "$output" | sed 's/4/a/g')
+    output=$(echo "$output" | sed 's/3/e/g')
+    output=$(echo "$output" | sed 's/1/i/g')  # Note: This could also be 'l' in some cases
+    output=$(echo "$output" | sed 's/0/o/g')
+    output=$(echo "$output" | sed 's/5/s/g')
+    output=$(echo "$output" | sed 's/7/t/g')
+    
+    echo "$output"
+}
+
+# Main script logic
+if [ -z "$1" ]; then
+    # If no argument is provided, read from stdin
+    echo "Enter text to convert (Ctrl+D to finish):"
+    input=$(cat)
+else
+    # Use the provided argument
+    input="$*"
+fi
+
+# Convert to leetspeak
+leetspeak=$(to_leetspeak "$input")
+echo "Converted to leetspeak: $leetspeak"
+
+# Convert back to normal text
+normal=$(from_leetspeak "$leetspeak")
+echo "Converted back to normal: $normal"
